@@ -8,20 +8,31 @@ const CONFIG = {
 };
 
 // ============================
-// MINIMAL ABI
+// MINIMAL ABI (UPDATED)
 // ============================
 const ENIAC_ABI = [
     "function balanceOf(address owner) view returns (uint256)",
     "function decimals() view returns (uint8)",
     "function allowance(address owner, address spender) view returns (uint256)",
-    "function approve(address spender, uint256 amount) returns (bool)"
+    "function approve(address spender, uint256 amount) returns (bool)",
+    "function totalSupply() view returns (uint256)"
 ];
 
 const MASTERCHEF_ABI = [
+    // Core Functions
+    "function poolInfo(uint256) view returns (address lpToken, uint256 allocPoint, uint256 lastRewardBlock, uint256 accANTPerShare)",
     "function userInfo(uint256, address) view returns (uint256 amount, uint256 rewardDebt)",
     "function pendingANT(uint256 _pid, address _user) view returns (uint256)",
     "function deposit(uint256 _pid, uint256 _amount)",
-    "function withdraw(uint256 _pid, uint256 _amount)"
+    "function withdraw(uint256 _pid, uint256 _amount)",
+    "function emergencyWithdraw(uint256 _pid)",
+    
+    // Info Functions
+    "function poolLength() view returns (uint256)",
+    "function totalAllocPoint() view returns (uint256)",
+    
+    // Token Functions
+    "function ANT() view returns (address)"
 ];
 
 // ============================
@@ -29,7 +40,7 @@ const MASTERCHEF_ABI = [
 // ============================
 let provider, signer, userAddress;
 let eniacContract, masterchefContract;
-let currentPoolId = 1;
+let currentPoolId = null; // Will find automatically
 let tokenDecimals = 18;
 
 // ============================
@@ -99,6 +110,9 @@ async function setupApp() {
         eniacContract = new ethers.Contract(CONFIG.ENIAC_TOKEN, ENIAC_ABI, signer);
         masterchefContract = new ethers.Contract(CONFIG.MASTERCHEF, MASTERCHEF_ABI, signer);
         
+        // Find the correct pool ID
+        await findCorrectPool();
+        
         // Load initial data
         await loadData();
         
@@ -112,10 +126,57 @@ async function setupApp() {
 }
 
 // ============================
+// FIND CORRECT POOL
+// ============================
+async function findCorrectPool() {
+    try {
+        // Get the ANT token address from MasterChef
+        const antAddress = await masterchefContract.ANT();
+        console.log('ANT token address from MasterChef:', antAddress);
+        
+        // Get pool length
+        const poolLength = await masterchefContract.poolLength();
+        console.log('Total pools:', poolLength.toString());
+        
+        // Search for pool containing ENiAC token
+        for (let i = 0; i < poolLength; i++) {
+            try {
+                const poolInfo = await masterchefContract.poolInfo(i);
+                console.log(`Pool ${i}: LP Token = ${poolInfo.lpToken}`);
+                
+                // Check if this pool contains ENiAC token
+                if (poolInfo.lpToken.toLowerCase() === CONFIG.ENIAC_TOKEN.toLowerCase()) {
+                    currentPoolId = i;
+                    console.log(`✅ Found ENiAC pool at ID: ${currentPoolId}`);
+                    return;
+                }
+            } catch (e) {
+                console.log(`Error checking pool ${i}:`, e.message);
+                continue;
+            }
+        }
+        
+        // If not found, check if ANT token matches ENiAC
+        if (antAddress.toLowerCase() === CONFIG.ENIAC_TOKEN.toLowerCase()) {
+            console.log('✅ ANT token is ENiAC token');
+            // Usually pool 0 is the main ANT token pool
+            currentPoolId = 0;
+        } else {
+            console.log('❌ ENiAC pool not found. Using pool 0 as default.');
+            currentPoolId = 0;
+        }
+        
+    } catch (error) {
+        console.error('Error finding pool:', error);
+        currentPoolId = 0; // Default to pool 0
+    }
+}
+
+// ============================
 // LOAD DATA
 // ============================
 async function loadData() {
-    if (!userAddress) return;
+    if (!userAddress || currentPoolId === null) return;
     
     try {
         // 1. Load wallet balance
@@ -146,7 +207,7 @@ async function loadData() {
             document.getElementById('stakeBtn').disabled = true;
         }
         
-        // 3. Try to load staking data from different pools
+        // 3. Load staking data
         await loadStakingData();
         
     } catch (error) {
@@ -155,53 +216,44 @@ async function loadData() {
 }
 
 async function loadStakingData() {
-    // Try pool 1, 0, 2, 3
-    const poolIds = [1, 0, 2, 3];
-    
-    for (const pid of poolIds) {
-        try {
-            const userInfo = await masterchefContract.userInfo(pid, userAddress);
-            const stakedAmount = ethers.utils.formatUnits(userInfo.amount, 18);
-            
-            // If user has staked in this pool
-            if (parseFloat(stakedAmount) > 0) {
-                currentPoolId = pid;
-                document.getElementById('stakedAmount').textContent = 
-                    parseFloat(stakedAmount).toFixed(4) + ' ENiAC';
-                
-                // Load pending rewards
-                const pending = await masterchefContract.pendingANT(pid, userAddress);
-                const pendingFormatted = ethers.utils.formatUnits(pending, 18);
-                document.getElementById('pendingRewards').textContent = 
-                    parseFloat(pendingFormatted).toFixed(4) + ' ENiAC';
-                
-                // Enable buttons
-                document.getElementById('unstakeBtn').disabled = false;
-                document.getElementById('claimBtn').disabled = parseFloat(pendingFormatted) <= 0;
-                
-                console.log(`Found staked amount in pool ${pid}: ${stakedAmount} ENiAC`);
-                return;
-            }
-        } catch (error) {
-            continue;
-        }
+    try {
+        const userInfo = await masterchefContract.userInfo(currentPoolId, userAddress);
+        const stakedAmount = ethers.utils.formatUnits(userInfo.amount, 18);
+        
+        document.getElementById('stakedAmount').textContent = 
+            parseFloat(stakedAmount).toFixed(4) + ' ENiAC';
+        
+        // Load pending rewards
+        const pending = await masterchefContract.pendingANT(currentPoolId, userAddress);
+        const pendingFormatted = ethers.utils.formatUnits(pending, 18);
+        document.getElementById('pendingRewards').textContent = 
+            parseFloat(pendingFormatted).toFixed(4) + ' ENiAC';
+        
+        // Enable/disable buttons
+        document.getElementById('unstakeBtn').disabled = parseFloat(stakedAmount) <= 0;
+        document.getElementById('claimBtn').disabled = parseFloat(pendingFormatted) <= 0;
+        
+        console.log(`Staked: ${stakedAmount} ENiAC, Pending: ${pendingFormatted} ENiAC`);
+        
+    } catch (error) {
+        console.error('Load staking data error:', error);
+        document.getElementById('stakedAmount').textContent = '0 ENiAC';
+        document.getElementById('pendingRewards').textContent = '0 ENiAC';
+        document.getElementById('unstakeBtn').disabled = true;
+        document.getElementById('claimBtn').disabled = true;
     }
-    
-    // If no staking found
-    document.getElementById('stakedAmount').textContent = '0 ENiAC';
-    document.getElementById('pendingRewards').textContent = '0 ENiAC';
-    document.getElementById('unstakeBtn').disabled = true;
-    document.getElementById('claimBtn').disabled = true;
 }
 
 // ============================
-// TRANSACTION FUNCTIONS
+// TRANSACTION FUNCTIONS (FIXED)
 // ============================
 function setMaxAmount() {
     const balanceText = document.getElementById('walletBalance').textContent;
     const balance = parseFloat(balanceText);
     if (!isNaN(balance) && balance > 0) {
-        document.getElementById('amountInput').value = balance.toFixed(4);
+        // Leave a little for gas (optional)
+        const maxAmount = Math.max(0, balance - 0.001);
+        document.getElementById('amountInput').value = maxAmount.toFixed(4);
     }
 }
 
@@ -215,13 +267,21 @@ async function approveTokens() {
             return;
         }
         
+        // Check balance first
+        const balance = await eniacContract.balanceOf(userAddress);
+        const balanceFormatted = ethers.utils.formatUnits(balance, 18);
+        
+        if (amountNum > parseFloat(balanceFormatted)) {
+            showMessage(`Insufficient balance. You have ${parseFloat(balanceFormatted).toFixed(4)} ENiAC`, 'error');
+            return;
+        }
+        
         showMessage('Approving tokens...', 'info');
         
-        // Convert to string and use parseUnits
-        const amountStr = amountNum.toString();
-        const amountWei = ethers.utils.parseUnits(amountStr, 18);
+        // Use MaxUint256 for unlimited approval
+        const maxApproval = ethers.constants.MaxUint256;
         
-        const tx = await eniacContract.approve(CONFIG.MASTERCHEF, amountWei);
+        const tx = await eniacContract.approve(CONFIG.MASTERCHEF, maxApproval);
         
         showMessage('Approval submitted. Waiting...', 'info');
         await tx.wait();
@@ -231,7 +291,7 @@ async function approveTokens() {
         
     } catch (error) {
         console.error('Approve error:', error);
-        showMessage('Approve failed: ' + (error.message || 'Unknown error'), 'error');
+        showMessage('Approve failed: ' + getErrorMessage(error), 'error');
     }
 }
 
@@ -245,13 +305,44 @@ async function stakeTokens() {
             return;
         }
         
+        // Check balance
+        const balance = await eniacContract.balanceOf(userAddress);
+        const balanceFormatted = parseFloat(ethers.utils.formatUnits(balance, 18));
+        
+        if (amountNum > balanceFormatted) {
+            showMessage(`Insufficient balance. You have ${balanceFormatted.toFixed(4)} ENiAC`, 'error');
+            return;
+        }
+        
+        // Check allowance
+        const allowance = await eniacContract.allowance(userAddress, CONFIG.MASTERCHEF);
+        const allowanceFormatted = parseFloat(ethers.utils.formatUnits(allowance, 18));
+        
+        if (amountNum > allowanceFormatted) {
+            showMessage('Insufficient allowance. Please approve first.', 'error');
+            return;
+        }
+        
         showMessage('Staking tokens...', 'info');
         
-        // Convert to string and use parseUnits
-        const amountStr = amountNum.toString();
-        const amountWei = ethers.utils.parseUnits(amountStr, 18);
+        // Convert to wei
+        const amountWei = ethers.utils.parseUnits(amountNum.toString(), 18);
         
-        const tx = await masterchefContract.deposit(currentPoolId, amountWei);
+        // Estimate gas
+        let gasEstimate;
+        try {
+            gasEstimate = await masterchefContract.estimateGas.deposit(currentPoolId, amountWei);
+            console.log('Gas estimate:', gasEstimate.toString());
+        } catch (gasError) {
+            console.log('Gas estimation failed:', gasError.message);
+            // Use default gas limit
+            gasEstimate = ethers.BigNumber.from(300000);
+        }
+        
+        // Send transaction with proper gas settings
+        const tx = await masterchefContract.deposit(currentPoolId, amountWei, {
+            gasLimit: gasEstimate.mul(120).div(100) // 20% buffer
+        });
         
         showMessage('Stake submitted. Waiting...', 'info');
         await tx.wait();
@@ -263,18 +354,18 @@ async function stakeTokens() {
     } catch (error) {
         console.error('Stake error:', error);
         
-        // Try different pool if pool 1 fails
-        if (error.message.includes('INVALID_POOL') || 
-            error.message.includes('execution reverted') ||
-            error.message.includes('Invalid pool')) {
+        const errorMsg = getErrorMessage(error);
+        
+        // Try pool 0 if current pool fails
+        if (error.message.includes('Invalid pool') || 
+            error.message.includes('execution reverted')) {
             
             showMessage('Trying pool 0 instead...', 'info');
             
             try {
                 const amountInput = document.getElementById('amountInput').value;
                 const amountNum = parseFloat(amountInput);
-                const amountStr = amountNum.toString();
-                const amountWei = ethers.utils.parseUnits(amountStr, 18);
+                const amountWei = ethers.utils.parseUnits(amountNum.toString(), 18);
                 
                 const tx = await masterchefContract.deposit(0, amountWei);
                 await tx.wait();
@@ -283,10 +374,10 @@ async function stakeTokens() {
                 currentPoolId = 0;
                 await loadData();
             } catch (retryError) {
-                showMessage('Stake failed in all pools: ' + retryError.message, 'error');
+                showMessage('Stake failed: ' + getErrorMessage(retryError), 'error');
             }
         } else {
-            showMessage('Stake failed: ' + error.message, 'error');
+            showMessage('Stake failed: ' + errorMsg, 'error');
         }
     }
 }
@@ -301,12 +392,18 @@ async function unstakeTokens() {
             return;
         }
         
+        // Check staked amount
+        const userInfo = await masterchefContract.userInfo(currentPoolId, userAddress);
+        const stakedAmount = parseFloat(ethers.utils.formatUnits(userInfo.amount, 18));
+        
+        if (amountNum > stakedAmount) {
+            showMessage(`Insufficient staked amount. You have ${stakedAmount.toFixed(4)} ENiAC staked`, 'error');
+            return;
+        }
+        
         showMessage('Unstaking tokens...', 'info');
         
-        // Convert to string and use parseUnits
-        const amountStr = amountNum.toString();
-        const amountWei = ethers.utils.parseUnits(amountStr, 18);
-        
+        const amountWei = ethers.utils.parseUnits(amountNum.toString(), 18);
         const tx = await masterchefContract.withdraw(currentPoolId, amountWei);
         
         showMessage('Unstake submitted. Waiting...', 'info');
@@ -318,7 +415,7 @@ async function unstakeTokens() {
         
     } catch (error) {
         console.error('Unstake error:', error);
-        showMessage('Unstake failed: ' + error.message, 'error');
+        showMessage('Unstake failed: ' + getErrorMessage(error), 'error');
     }
 }
 
@@ -337,7 +434,7 @@ async function claimRewards() {
         
     } catch (error) {
         console.error('Claim error:', error);
-        showMessage('Claim failed: ' + error.message, 'error');
+        showMessage('Claim failed: ' + getErrorMessage(error), 'error');
     }
 }
 
@@ -357,6 +454,35 @@ function showMessage(message, type) {
     }, 5000);
 }
 
+function getErrorMessage(error) {
+    if (error.code === 4001) {
+        return 'Transaction rejected by user';
+    }
+    
+    if (error.message.includes('insufficient funds')) {
+        return 'Insufficient BNB for gas fees';
+    }
+    
+    if (error.message.includes('transfer amount exceeds balance')) {
+        return 'Insufficient token balance';
+    }
+    
+    if (error.message.includes('execution reverted')) {
+        // Try to extract revert reason
+        const match = error.message.match(/execution reverted: (.*)/);
+        if (match) {
+            return `Contract error: ${match[1]}`;
+        }
+        return 'Contract execution reverted';
+    }
+    
+    if (error.message.includes('INVALID_ARGUMENT')) {
+        return 'Invalid input amount';
+    }
+    
+    return error.message || 'Unknown error';
+}
+
 // ============================
 // EVENT LISTENERS
 // ============================
@@ -366,7 +492,6 @@ if (window.ethereum) {
             userAddress = accounts[0];
             setupApp();
         } else {
-            // Disconnected
             location.reload();
         }
     });
@@ -392,6 +517,10 @@ async function testConnection() {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const network = await provider.getNetwork();
         resultEl.innerHTML = `✅ Connected to chain ${network.chainId}`;
+        
+        if (network.chainId !== CONFIG.BSC_CHAIN_ID) {
+            resultEl.innerHTML += `<br>⚠️ Please switch to BSC Mainnet (Chain ID: ${CONFIG.BSC_CHAIN_ID})`;
+        }
         
         const eniacContract = new ethers.Contract(
             CONFIG.ENIAC_TOKEN,
@@ -426,7 +555,7 @@ async function testApprove() {
         
         const tx = await eniacContract.approve(
             CONFIG.MASTERCHEF,
-            ethers.utils.parseUnits('0.01', 18)
+            ethers.constants.MaxUint256
         );
         
         resultEl.innerHTML = `✅ Approval sent: ${tx.hash}`;
@@ -450,10 +579,10 @@ async function testStake() {
             signer
         );
         
-        // Try pool 0 first
+        // Try with a very small amount
         const tx = await masterchefContract.deposit(
             0,
-            ethers.utils.parseUnits('0.01', 18)
+            ethers.utils.parseUnits('0.001', 18)
         );
         
         resultEl.innerHTML = `✅ Stake sent to pool 0: ${tx.hash}`;
