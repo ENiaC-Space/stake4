@@ -29,7 +29,7 @@ const MASTERCHEF_ABI = [
 // ============================
 let provider, signer, userAddress;
 let eniacContract, masterchefContract;
-let currentPoolId = 1; // Thử với pool 1
+let currentPoolId = 1;
 let tokenDecimals = 18;
 
 // ============================
@@ -52,10 +52,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('maxBtn').addEventListener('click', setMaxAmount);
     
     // Check if already connected
-    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-    if (accounts.length > 0) {
-        userAddress = accounts[0];
-        await setupApp();
+    try {
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length > 0) {
+            userAddress = accounts[0];
+            await setupApp();
+        }
+    } catch (error) {
+        console.log('No cached connection');
     }
 });
 
@@ -204,14 +208,19 @@ function setMaxAmount() {
 async function approveTokens() {
     try {
         const amountInput = document.getElementById('amountInput').value;
-        if (!amountInput || parseFloat(amountInput) <= 0) {
-            showMessage('Please enter amount first', 'warning');
+        const amountNum = parseFloat(amountInput);
+        
+        if (!amountInput || isNaN(amountNum) || amountNum <= 0) {
+            showMessage('Please enter a valid amount', 'warning');
             return;
         }
         
         showMessage('Approving tokens...', 'info');
         
-        const amountWei = ethers.utils.parseUnits(amountInput, 18);
+        // Convert to string and use parseUnits
+        const amountStr = amountNum.toString();
+        const amountWei = ethers.utils.parseUnits(amountStr, 18);
+        
         const tx = await eniacContract.approve(CONFIG.MASTERCHEF, amountWei);
         
         showMessage('Approval submitted. Waiting...', 'info');
@@ -229,14 +238,19 @@ async function approveTokens() {
 async function stakeTokens() {
     try {
         const amountInput = document.getElementById('amountInput').value;
-        if (!amountInput || parseFloat(amountInput) <= 0) {
-            showMessage('Please enter amount first', 'warning');
+        const amountNum = parseFloat(amountInput);
+        
+        if (!amountInput || isNaN(amountNum) || amountNum <= 0) {
+            showMessage('Please enter a valid amount', 'warning');
             return;
         }
         
         showMessage('Staking tokens...', 'info');
         
-        const amountWei = ethers.utils.parseUnits(amountInput, 18);
+        // Convert to string and use parseUnits
+        const amountStr = amountNum.toString();
+        const amountWei = ethers.utils.parseUnits(amountStr, 18);
+        
         const tx = await masterchefContract.deposit(currentPoolId, amountWei);
         
         showMessage('Stake submitted. Waiting...', 'info');
@@ -250,16 +264,23 @@ async function stakeTokens() {
         console.error('Stake error:', error);
         
         // Try different pool if pool 1 fails
-        if (error.message.includes('INVALID_POOL') || error.message.includes('execution reverted')) {
-            currentPoolId = 0; // Try pool 0
+        if (error.message.includes('INVALID_POOL') || 
+            error.message.includes('execution reverted') ||
+            error.message.includes('Invalid pool')) {
+            
             showMessage('Trying pool 0 instead...', 'info');
             
             try {
-                const amountWei = ethers.utils.parseUnits(amountInput, 18);
+                const amountInput = document.getElementById('amountInput').value;
+                const amountNum = parseFloat(amountInput);
+                const amountStr = amountNum.toString();
+                const amountWei = ethers.utils.parseUnits(amountStr, 18);
+                
                 const tx = await masterchefContract.deposit(0, amountWei);
                 await tx.wait();
                 showMessage('Tokens staked successfully in pool 0!', 'success');
                 document.getElementById('amountInput').value = '';
+                currentPoolId = 0;
                 await loadData();
             } catch (retryError) {
                 showMessage('Stake failed in all pools: ' + retryError.message, 'error');
@@ -273,14 +294,19 @@ async function stakeTokens() {
 async function unstakeTokens() {
     try {
         const amountInput = document.getElementById('amountInput').value;
-        if (!amountInput || parseFloat(amountInput) <= 0) {
-            showMessage('Please enter amount first', 'warning');
+        const amountNum = parseFloat(amountInput);
+        
+        if (!amountInput || isNaN(amountNum) || amountNum <= 0) {
+            showMessage('Please enter a valid amount', 'warning');
             return;
         }
         
         showMessage('Unstaking tokens...', 'info');
         
-        const amountWei = ethers.utils.parseUnits(amountInput, 18);
+        // Convert to string and use parseUnits
+        const amountStr = amountNum.toString();
+        const amountWei = ethers.utils.parseUnits(amountStr, 18);
+        
         const tx = await masterchefContract.withdraw(currentPoolId, amountWei);
         
         showMessage('Unstake submitted. Waiting...', 'info');
@@ -348,4 +374,129 @@ if (window.ethereum) {
     window.ethereum.on('chainChanged', () => {
         location.reload();
     });
+}
+
+// ============================
+// DEBUG FUNCTIONS
+// ============================
+async function testConnection() {
+    const resultEl = document.getElementById('testResult');
+    resultEl.innerHTML = 'Testing connection...';
+    
+    try {
+        if (!window.ethereum) {
+            resultEl.innerHTML = '❌ MetaMask not installed';
+            return;
+        }
+        
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const network = await provider.getNetwork();
+        resultEl.innerHTML = `✅ Connected to chain ${network.chainId}`;
+        
+        const eniacContract = new ethers.Contract(
+            CONFIG.ENIAC_TOKEN,
+            ['function balanceOf(address) view returns (uint256)'],
+            provider
+        );
+        
+        const accounts = await provider.listAccounts();
+        if (accounts.length > 0) {
+            const balance = await eniacContract.balanceOf(accounts[0]);
+            resultEl.innerHTML += `<br>💰 Balance: ${ethers.utils.formatUnits(balance, 18)} ENiAC`;
+        }
+        
+    } catch (error) {
+        resultEl.innerHTML = `❌ Test failed: ${error.message}`;
+    }
+}
+
+async function testApprove() {
+    const resultEl = document.getElementById('testResult');
+    resultEl.innerHTML = 'Testing approve...';
+    
+    try {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        
+        const eniacContract = new ethers.Contract(
+            CONFIG.ENIAC_TOKEN,
+            ['function approve(address,uint256) returns (bool)'],
+            signer
+        );
+        
+        const tx = await eniacContract.approve(
+            CONFIG.MASTERCHEF,
+            ethers.utils.parseUnits('0.01', 18)
+        );
+        
+        resultEl.innerHTML = `✅ Approval sent: ${tx.hash}`;
+        
+    } catch (error) {
+        resultEl.innerHTML = `❌ Approve failed: ${error.message}`;
+    }
+}
+
+async function testStake() {
+    const resultEl = document.getElementById('testResult');
+    resultEl.innerHTML = 'Testing stake...';
+    
+    try {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        
+        const masterchefContract = new ethers.Contract(
+            CONFIG.MASTERCHEF,
+            ['function deposit(uint256,uint256)'],
+            signer
+        );
+        
+        // Try pool 0 first
+        const tx = await masterchefContract.deposit(
+            0,
+            ethers.utils.parseUnits('0.01', 18)
+        );
+        
+        resultEl.innerHTML = `✅ Stake sent to pool 0: ${tx.hash}`;
+        
+    } catch (error) {
+        resultEl.innerHTML = `❌ Stake failed: ${error.message}`;
+    }
+}
+
+async function showPoolInfo() {
+    const resultEl = document.getElementById('testResult');
+    resultEl.innerHTML = 'Checking pools...';
+    
+    try {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        
+        const masterchefContract = new ethers.Contract(
+            CONFIG.MASTERCHEF,
+            ['function userInfo(uint256,address) view returns (uint256,uint256)'],
+            provider
+        );
+        
+        const accounts = await provider.listAccounts();
+        if (accounts.length === 0) {
+            resultEl.innerHTML = '❌ No wallet connected';
+            return;
+        }
+        
+        let info = '';
+        // Check pools 0-3
+        for (let i = 0; i < 4; i++) {
+            try {
+                const userInfo = await masterchefContract.userInfo(i, accounts[0]);
+                const amount = ethers.utils.formatUnits(userInfo.amount, 18);
+                info += `Pool ${i}: ${amount} ENiAC<br>`;
+            } catch (e) {
+                info += `Pool ${i}: Error - ${e.message}<br>`;
+            }
+        }
+        
+        resultEl.innerHTML = info;
+        
+    } catch (error) {
+        resultEl.innerHTML = `❌ Pool check failed: ${error.message}`;
+    }
 }
