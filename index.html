@@ -3,330 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ENiAC Staking | Stake & Earn Rewards</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>ENiAC Staking</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="icon" type="image/x-icon" href="https://img.icons8.com/color/96/000000/ethereum.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="loading-spinner">
-            <div class="spinner"></div>
-            <p>Initializing DApp...</p>
-        </div>
-    </div>
-
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="logo">
-                <i class="fas fa-robot"></i>
-                <span>ENiAC Staking</span>
-            </div>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1><i class="fas fa-robot"></i> ENiAC Staking</h1>
+            <p>Stake ENiAC tokens and earn rewards on Ethereum Mainnet</p>
+            
             <div class="wallet-section">
-                <div class="network-badge" id="networkBadge">
-                    <i class="fas fa-circle"></i>
+                <div class="wallet-info" id="walletInfo">
+                    <i class="fas fa-wallet"></i>
                     <span>Not Connected</span>
                 </div>
-                <div class="wallet-address" id="walletAddress">
-                    Not Connected
-                </div>
                 <button class="connect-btn" id="connectBtn">
-                    <i class="fas fa-wallet"></i>
-                    <span id="connectBtnText">Connect Wallet</span>
+                    <i class="fas fa-plug"></i> Connect Wallet
                 </button>
             </div>
-        </div>
-    </nav>
+        </header>
 
-    <!-- Main Content -->
-    <main class="container">
-        <!-- Hero Section -->
-        <section class="hero">
-            <div class="hero-content">
-                <h1>Stake ENiAC Tokens</h1>
-                <p class="subtitle">Earn passive income by staking ENiAC tokens. Secure, transparent, and efficient yield farming on Ethereum.</p>
-                
-                <div class="warning-box" id="networkWarning" style="display: none;">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Please switch to <strong>Ethereum Mainnet</strong> to use this dApp.</p>
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Stats Row -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-coins"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Wallet Balance</h3>
+                        <div class="stat-value" id="walletBalance">0 ENiAC</div>
+                    </div>
                 </div>
                 
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-percentage"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3 id="totalApy">--%</h3>
-                            <p>Average APY</p>
-                        </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-lock"></i>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3 id="totalStakers">--</h3>
-                            <p>Total Stakers</p>
-                        </div>
+                    <div class="stat-content">
+                        <h3>Staked Amount</h3>
+                        <div class="stat-value" id="stakedAmount">0 ENiAC</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-gift"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Pending Rewards</h3>
+                        <div class="stat-value" id="pendingRewards">0 ENiAC</div>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Allowance</h3>
+                        <div class="stat-value" id="allowanceAmount">0 ENiAC</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stake Card -->
+            <div class="card">
+                <h2><i class="fas fa-lock"></i> Stake ENiAC Tokens</h2>
+                
+                <div class="form-group">
+                    <label for="amountInput">Amount to Stake/Unstake</label>
+                    <div class="input-with-button">
+                        <input type="number" id="amountInput" placeholder="0.0" min="0" step="0.1">
+                        <button class="max-btn" onclick="setMaxAmount()">
+                            <i class="fas fa-arrow-up"></i> MAX
+                        </button>
+                    </div>
+                    <div class="balance-info">
+                        Available: <span id="availableBalance">0</span> ENiAC
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-success" id="approveBtn" onclick="approveTokens()">
+                        <i class="fas fa-check-circle"></i> Approve
+                    </button>
+                    <button class="btn btn-primary" id="stakeBtn" onclick="stakeTokens()">
+                        <i class="fas fa-lock"></i> Stake
+                    </button>
+                    <button class="btn btn-danger" id="unstakeBtn" onclick="unstakeTokens()">
+                        <i class="fas fa-unlock"></i> Unstake
+                    </button>
+                    <button class="btn btn-warning" id="claimBtn" onclick="claimRewards()">
+                        <i class="fas fa-gift"></i> Claim Rewards
+                    </button>
+                </div>
+
+                <div class="network-info">
+                    <i class="fas fa-info-circle"></i>
+                    <p>You need ETH for gas fees. Make sure you're on Ethereum Mainnet.</p>
+                </div>
+            </div>
+
+            <!-- Contract Info -->
+            <div class="card">
+                <h2><i class="fas fa-file-contract"></i> Smart Contracts</h2>
+                
+                <div class="contract-info">
+                    <div class="contract-item">
+                        <div class="contract-icon">
                             <i class="fas fa-coins"></i>
                         </div>
-                        <div class="stat-info">
-                            <h3 id="totalValueLocked">--</h3>
-                            <p>Total Value Locked</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-bolt"></i>
-                        </div>
-                        <div class="stat-info">
-                            <h3 id="antPerBlock">--</h3>
-                            <p>ENiAC/Block</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Dashboard Grid -->
-        <div class="dashboard-grid">
-            <!-- Stake Card -->
-            <div class="dashboard-card">
-                <div class="card-header">
-                    <h2><i class="fas fa-lock"></i> Stake ENiAC</h2>
-                    <div class="card-badge" id="networkStatus">Mainnet</div>
-                </div>
-                
-                <div class="wallet-status" id="walletStatus">
-                    <i class="fas fa-info-circle"></i>
-                    <p>Connect your wallet to start staking</p>
-                </div>
-                
-                <div class="balance-info">
-                    <div class="balance-item">
-                        <span class="label">Wallet Balance</span>
-                        <span class="value" id="walletBalance">0 ENiAC</span>
-                    </div>
-                    <div class="balance-item">
-                        <span class="label">Staked Amount</span>
-                        <span class="value" id="stakedAmount">0 ENiAC</span>
-                    </div>
-                    <div class="balance-item">
-                        <span class="label">Pending Rewards</span>
-                        <span class="value reward" id="pendingRewards">0 ENiAC</span>
-                    </div>
-                    <div class="balance-item">
-                        <span class="label">Allowance</span>
-                        <span class="value" id="allowanceAmount">0 ENiAC</span>
-                    </div>
-                </div>
-
-                <!-- Stake Form -->
-                <div class="stake-form">
-                    <div class="form-group">
-                        <label for="stakeAmount">Amount to Stake/Unstake</label>
-                        <div class="input-with-actions">
-                            <input 
-                                type="number" 
-                                id="stakeAmount" 
-                                placeholder="0.0" 
-                                min="0" 
-                                step="0.1"
-                                disabled
-                            >
-                            <div class="input-actions">
-                                <button class="action-btn" id="maxBtn" disabled>
-                                    <i class="fas fa-arrow-up"></i> MAX
-                                </button>
-                                <button class="action-btn" id="halfBtn" disabled>
-                                    <i class="fas fa-divide"></i> HALF
-                                </button>
-                            </div>
-                        </div>
-                        <div class="balance-hint">
-                            Available: <span id="availableBalance">0</span> ENiAC
-                        </div>
-                    </div>
-
-                    <div class="action-buttons">
-                        <button class="btn btn-success" id="approveBtn" disabled>
-                            <i class="fas fa-check-circle"></i>
-                            <span id="approveBtnText">Approve ENiAC</span>
-                        </button>
-                        <button class="btn btn-primary" id="stakeBtn" disabled>
-                            <i class="fas fa-lock"></i>
-                            <span id="stakeBtnText">Stake</span>
-                        </button>
-                        <button class="btn btn-danger" id="unstakeBtn" disabled>
-                            <i class="fas fa-unlock"></i>
-                            <span id="unstakeBtnText">Unstake</span>
-                        </button>
-                        <button class="btn btn-warning" id="claimBtn" disabled>
-                            <i class="fas fa-gift"></i>
-                            <span id="claimBtnText">Claim Rewards</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="info-box">
-                    <i class="fas fa-info-circle"></i>
-                    <p id="infoText">Connect your wallet to start staking ENiAC tokens and earning rewards.</p>
-                </div>
-            </div>
-
-            <!-- Pools Card -->
-            <div class="dashboard-card">
-                <div class="card-header">
-                    <h2><i class="fas fa-swimming-pool"></i> Active Pools</h2>
-                    <div class="card-badge" id="poolCount">0 Pools</div>
-                </div>
-
-                <div class="pools-container">
-                    <div class="pools-list" id="poolsList">
-                        <div class="loading-state">
-                            <i class="fas fa-spinner fa-spin"></i>
-                            <p id="poolsLoadingText">Connect wallet to view pools</p>
+                        <div class="contract-details">
+                            <h3>ENiAC Token</h3>
+                            <p class="contract-address">0xafF339de48848d0F8B5704909Ac94e8E8D7E3415</p>
+                            <a href="https://etherscan.io/address/0xafF339de48848d0F8B5704909Ac94e8E8D7E3415" target="_blank">
+                                <i class="fas fa-external-link-alt"></i> View on Etherscan
+                            </a>
                         </div>
                     </div>
                     
-                    <div class="pool-controls">
-                        <button class="btn btn-outline" id="refreshPoolsBtn" disabled>
-                            <i class="fas fa-sync-alt"></i> Refresh Pools
-                        </button>
+                    <div class="contract-item">
+                        <div class="contract-icon">
+                            <i class="fas fa-chess-queen"></i>
+                        </div>
+                        <div class="contract-details">
+                            <h3>MasterChef</h3>
+                            <p class="contract-address">0x564DF71B75855d63c86a267206Cd0c9e35c92789</p>
+                            <a href="https://etherscan.io/address/0x564DF71B75855d63c86a267206Cd0c9e35c92789" target="_blank">
+                                <i class="fas fa-external-link-alt"></i> View on Etherscan
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
 
-        <!-- Contract Info -->
-        <section class="contract-section">
-            <h2><i class="fas fa-file-contract"></i> Smart Contracts</h2>
-            <div class="contract-cards">
-                <div class="contract-card">
-                    <div class="contract-icon">
-                        <i class="fas fa-coins"></i>
-                    </div>
-                    <div class="contract-info">
-                        <h3>ENiAC Token</h3>
-                        <p class="contract-address" id="eniacTokenAddress">
-                            0xafF339de48848d0F8B5704909Ac94e8E8D7E3415
-                        </p>
-                        <a href="https://etherscan.io/address/0xafF339de48848d0F8B5704909Ac94e8E8D7E3415" 
-                           target="_blank" class="contract-link">
-                            <i class="fas fa-external-link-alt"></i> View on Etherscan
-                        </a>
-                    </div>
-                </div>
-                
-                <div class="contract-card">
-                    <div class="contract-icon">
-                        <i class="fas fa-chess-queen"></i>
-                    </div>
-                    <div class="contract-info">
-                        <h3>MasterChef</h3>
-                        <p class="contract-address" id="masterchefAddress">
-                            0x564DF71B75855d63c86a267206Cd0c9e35c92789
-                        </p>
-                        <a href="https://etherscan.io/address/0x564DF71B75855d63c86a267206Cd0c9e35c92789" 
-                           target="_blank" class="contract-link">
-                            <i class="fas fa-external-link-alt"></i> View on Etherscan
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </section>
+        <!-- Status Message -->
+        <div class="status-message" id="statusMessage"></div>
 
-        <!-- Help Section -->
-        <section class="help-section">
-            <h2><i class="fas fa-question-circle"></i> Need Help?</h2>
-            <div class="help-cards">
-                <div class="help-card">
-                    <i class="fas fa-wallet"></i>
-                    <h3>Connect Wallet</h3>
-                    <p>Make sure MetaMask is installed and you're on Ethereum Mainnet</p>
-                </div>
-                <div class="help-card">
-                    <i class="fas fa-gas-pump"></i>
-                    <h3>Gas Fees</h3>
-                    <p>You need ETH for transaction fees. Set appropriate gas price.</p>
-                </div>
-                <div class="help-card">
-                    <i class="fas fa-shield-alt"></i>
-                    <h3>Security</h3>
-                    <p>Always verify transactions on Etherscan before confirming.</p>
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="footer-content">
-            <div class="footer-section">
-                <h3>ENiAC Staking</h3>
-                <p>Decentralized yield farming platform on Ethereum Mainnet</p>
-                <div class="version">v1.0.0</div>
-            </div>
-            
-            <div class="footer-section">
-                <h3>Network Status</h3>
-                <div class="network-status">
-                    <div class="status-item">
-                        <span>Connection:</span>
-                        <strong id="connectionStatus">Disconnected</strong>
-                    </div>
-                    <div class="status-item">
-                        <span>Chain ID:</span>
-                        <strong id="chainId">--</strong>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="footer-bottom">
-            <p>© 2024 ENiAC Staking Platform. All smart contracts are deployed on Ethereum Mainnet.</p>
-            <p class="disclaimer">
+        <!-- Footer -->
+        <footer class="footer">
+            <p>ENiAC Staking Platform - Ethereum Mainnet</p>
+            <p class="footer-note">
                 <i class="fas fa-exclamation-triangle"></i>
-                This interface is for interacting with deployed contracts. Use at your own risk.
+                Always verify transactions on Etherscan
             </p>
-        </div>
-    </footer>
-
-    <!-- Transaction Modal -->
-    <div class="modal" id="transactionModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modalTitle">Transaction</h3>
-                <button class="modal-close" id="closeModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="tx-status">
-                    <div class="spinner" id="modalSpinner"></div>
-                    <p id="modalMessage">Initializing transaction...</p>
-                </div>
-                <div class="tx-details" id="txDetails">
-                    <div class="detail-item">
-                        <span>Status:</span>
-                        <span id="txStatus">Pending</span>
-                    </div>
-                    <div class="detail-item">
-                        <span>Transaction Hash:</span>
-                        <a href="#" target="_blank" id="txHashLink" style="color: #60a5fa;">--</a>
-                    </div>
-                </div>
-                <div class="tx-actions">
-                    <button class="btn btn-primary" id="closeTxModal">
-                        Close
-                    </button>
-                </div>
-            </div>
-        </div>
+        </footer>
     </div>
 
     <!-- Scripts -->
