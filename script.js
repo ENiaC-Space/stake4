@@ -3,21 +3,13 @@
 // ============================
 const CONFIG = {
     ENIAC_TOKEN: "0xafF339de48848d0F8B5704909Ac94e8E8D7E3415",
-    MASTERCHEF: "0x564DF71B75855d63c86a267206Cd0c9e35c92789",
-    
-    // RPC Endpoints (Fallback)
-    RPC_URLS: {
-        1: "https://eth.llamarpc.com", // Ethereum Mainnet
-        5: "https://rpc.ankr.com/eth_goerli", // Goerli
-        11155111: "https://rpc.sepolia.org" // Sepolia
-    }
+    MASTERCHEF: "0x564DF71B75855d63c86a267206Cd0c9e35c92789"
 };
 
 // ============================
-// CONTRACT ABIs (Minimal)
+// CONTRACT ABIs
 // ============================
 const ENIAC_ABI = [
-    // Basic ERC20
     "function balanceOf(address owner) view returns (uint256)",
     "function decimals() view returns (uint8)",
     "function allowance(address owner, address spender) view returns (uint256)",
@@ -25,8 +17,6 @@ const ENIAC_ABI = [
 ];
 
 const MASTERCHEF_ABI = [
-    // Core functions
-    "function poolLength() view returns (uint256)",
     "function poolInfo(uint256) view returns (address lpToken, uint256 allocPoint, uint256 lastRewardBlock, uint256 accANTPerShare)",
     "function userInfo(uint256, address) view returns (uint256 amount, uint256 rewardDebt)",
     "function pendingANT(uint256 _pid, address _user) view returns (uint256)",
@@ -46,7 +36,7 @@ let eniacContract = null;
 let masterchefContract = null;
 
 let isConnected = false;
-let currentPoolId = 1; // Default to pool 1 for ENiAC single stake
+let currentPoolId = 1;
 let tokenDecimals = 18;
 
 // ============================
@@ -62,6 +52,7 @@ const availableBalance = document.getElementById('availableBalance');
 const amountInput = document.getElementById('amountInput');
 const statusMessage = document.getElementById('statusMessage');
 
+const maxBtn = document.getElementById('maxBtn');
 const approveBtn = document.getElementById('approveBtn');
 const stakeBtn = document.getElementById('stakeBtn');
 const unstakeBtn = document.getElementById('unstakeBtn');
@@ -87,16 +78,7 @@ async function initializeApp() {
         console.log('✅ MetaMask detected');
         
         // Initialize provider
-        provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
-        
-        // Get initial chain ID
-        try {
-            const network = await provider.getNetwork();
-            chainId = network.chainId;
-            console.log('🌐 Initial chain ID:', chainId);
-        } catch (error) {
-            console.warn('Could not get initial chain ID:', error);
-        }
+        provider = new ethers.providers.Web3Provider(window.ethereum);
         
         // Check for cached connection
         const accounts = await provider.listAccounts();
@@ -119,11 +101,17 @@ function setupEventListeners() {
     // Connect button
     connectBtn.addEventListener('click', handleConnect);
     
+    // Transaction buttons
+    maxBtn.addEventListener('click', setMaxAmount);
+    approveBtn.addEventListener('click', approveTokens);
+    stakeBtn.addEventListener('click', stakeTokens);
+    unstakeBtn.addEventListener('click', unstakeTokens);
+    claimBtn.addEventListener('click', claimRewards);
+    
     // MetaMask events
     if (window.ethereum) {
         window.ethereum.on('accountsChanged', handleAccountsChanged);
         window.ethereum.on('chainChanged', handleChainChanged);
-        window.ethereum.on('disconnect', handleDisconnect);
     }
 }
 
@@ -161,10 +149,6 @@ async function handleConnect() {
         let errorMsg = 'Connection failed';
         if (error.code === 4001) {
             errorMsg = 'Connection rejected by user';
-        } else if (error.message.includes('User rejected')) {
-            errorMsg = 'Connection rejected';
-        } else {
-            errorMsg = error.message;
         }
         
         showStatus(errorMsg, 'error');
@@ -176,7 +160,7 @@ async function handleConnect() {
 async function setupConnection() {
     try {
         // Reinitialize provider
-        provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+        provider = new ethers.providers.Web3Provider(window.ethereum);
         signer = provider.getSigner();
         
         // Get chain ID
@@ -246,29 +230,10 @@ async function handleAccountsChanged(accounts) {
     updateUI();
 }
 
-function handleChainChanged(newChainId) {
-    console.log('🔗 Chain changed to:', newChainId);
-    
-    // Convert hex to decimal if needed
-    if (typeof newChainId === 'string' && newChainId.startsWith('0x')) {
-        chainId = parseInt(newChainId, 16);
-    } else {
-        chainId = newChainId;
-    }
-    
-    // Reload page to reset everything
-    showStatus('Network changed, reloading...', 'info');
-    setTimeout(() => {
-        window.location.reload();
-    }, 1000);
-}
-
-function handleDisconnect(error) {
-    console.log('🔌 Disconnected:', error);
-    userAddress = null;
-    isConnected = false;
-    updateUI();
-    showStatus('Wallet disconnected', 'warning');
+function handleChainChanged() {
+    console.log('🔗 Chain changed');
+    // Reload page
+    window.location.reload();
 }
 
 // ============================
@@ -279,13 +244,13 @@ function updateUI() {
         // Update wallet info
         const shortAddress = `${userAddress.substring(0, 6)}...${userAddress.substring(userAddress.length - 4)}`;
         walletInfo.innerHTML = `<i class="fas fa-wallet"></i> <span>${shortAddress}</span>`;
-        walletInfo.title = userAddress;
         
         // Update connect button
         connectBtn.innerHTML = '<i class="fas fa-check"></i> Connected';
         connectBtn.classList.add('connected');
         
         // Enable buttons
+        maxBtn.disabled = false;
         approveBtn.disabled = false;
         stakeBtn.disabled = false;
         unstakeBtn.disabled = false;
@@ -301,6 +266,7 @@ function updateUI() {
         connectBtn.classList.remove('connected');
         
         // Disable buttons
+        maxBtn.disabled = true;
         approveBtn.disabled = true;
         stakeBtn.disabled = true;
         unstakeBtn.disabled = true;
@@ -340,7 +306,7 @@ async function loadUserData() {
         
         // Try to load staking data
         try {
-            // Try pool 1 first (ENiAC single stake)
+            // Try pool 1 first
             const userInfo = await masterchefContract.userInfo(currentPoolId, userAddress);
             const staked = ethers.utils.formatUnits(userInfo.amount, tokenDecimals);
             stakedAmount.textContent = `${parseFloat(staked).toFixed(4)} ENiAC`;
@@ -363,7 +329,7 @@ async function loadUserData() {
                 pendingRewards.textContent = `${parseFloat(pendingFormatted).toFixed(4)} ENiAC`;
                 
             } catch (error) {
-                console.log('❌ Could not load any pool data:', error);
+                console.log('❌ Could not load any pool data');
                 stakedAmount.textContent = '0 ENiAC';
                 pendingRewards.textContent = '0 ENiAC';
             }
@@ -378,18 +344,14 @@ async function loadUserData() {
         if (parseFloat(allowanceFormatted) > 0) {
             approveBtn.innerHTML = '<i class="fas fa-check"></i> Approved';
             approveBtn.disabled = true;
-            approveBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-        } else {
-            approveBtn.innerHTML = '<i class="fas fa-check-circle"></i> Approve';
-            approveBtn.disabled = false;
-            approveBtn.style.background = '';
+            approveBtn.style.background = '#059669';
         }
         
         console.log('✅ User data loaded');
         
     } catch (error) {
         console.error('❌ Error loading user data:', error);
-        showStatus('Error loading data: ' + error.message, 'error');
+        showStatus('Error loading data', 'error');
     }
 }
 
@@ -427,21 +389,8 @@ async function approveTokens() {
         
         const amountWei = ethers.utils.parseUnits(amount, tokenDecimals);
         
-        // Estimate gas first
-        let gasLimit;
-        try {
-            const gasEstimate = await eniacContract.estimateGas.approve(CONFIG.MASTERCHEF, amountWei);
-            gasLimit = gasEstimate.mul(120).div(100); // Add 20% buffer
-            console.log('⛽ Gas estimate:', gasEstimate.toString());
-        } catch (gasError) {
-            console.warn('⚠️ Could not estimate gas, using default');
-            gasLimit = 100000;
-        }
-        
         // Send approval transaction
-        const tx = await eniacContract.approve(CONFIG.MASTERCHEF, amountWei, {
-            gasLimit: gasLimit
-        });
+        const tx = await eniacContract.approve(CONFIG.MASTERCHEF, amountWei);
         
         showStatus('Transaction submitted. Waiting for confirmation...', 'info');
         
@@ -454,7 +403,7 @@ async function approveTokens() {
             // Update approve button
             approveBtn.innerHTML = '<i class="fas fa-check"></i> Approved';
             approveBtn.disabled = true;
-            approveBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+            approveBtn.style.background = '#059669';
             
             // Reload allowance data
             await loadUserData();
@@ -471,8 +420,6 @@ async function approveTokens() {
             errorMsg = 'Transaction rejected by user';
         } else if (error.message.includes('insufficient funds')) {
             errorMsg = 'Insufficient ETH for gas fees';
-        } else if (error.message) {
-            errorMsg = error.message;
         }
         
         showStatus(errorMsg, 'error');
@@ -503,21 +450,8 @@ async function stakeTokens() {
             return;
         }
         
-        // Estimate gas for deposit
-        let gasLimit;
-        try {
-            const gasEstimate = await masterchefContract.estimateGas.deposit(currentPoolId, amountWei);
-            gasLimit = gasEstimate.mul(120).div(100); // Add 20% buffer
-            console.log('⛽ Deposit gas estimate:', gasEstimate.toString());
-        } catch (gasError) {
-            console.warn('⚠️ Could not estimate gas, using default');
-            gasLimit = 200000;
-        }
-        
         // Send deposit transaction
-        const tx = await masterchefContract.deposit(currentPoolId, amountWei, {
-            gasLimit: gasLimit
-        });
+        const tx = await masterchefContract.deposit(currentPoolId, amountWei);
         
         showStatus('Transaction submitted. Waiting for confirmation...', 'info');
         
@@ -542,10 +476,6 @@ async function stakeTokens() {
             errorMsg = 'Transaction rejected by user';
         } else if (error.message.includes('insufficient funds')) {
             errorMsg = 'Insufficient ETH for gas fees';
-        } else if (error.message.includes('allowance')) {
-            errorMsg = 'Insufficient allowance. Please approve more tokens.';
-        } else if (error.message) {
-            errorMsg = error.message;
         }
         
         showStatus(errorMsg, 'error');
@@ -569,21 +499,8 @@ async function unstakeTokens() {
         
         const amountWei = ethers.utils.parseUnits(amount, tokenDecimals);
         
-        // Estimate gas for withdraw
-        let gasLimit;
-        try {
-            const gasEstimate = await masterchefContract.estimateGas.withdraw(currentPoolId, amountWei);
-            gasLimit = gasEstimate.mul(120).div(100); // Add 20% buffer
-            console.log('⛽ Withdraw gas estimate:', gasEstimate.toString());
-        } catch (gasError) {
-            console.warn('⚠️ Could not estimate gas, using default');
-            gasLimit = 200000;
-        }
-        
         // Send withdraw transaction
-        const tx = await masterchefContract.withdraw(currentPoolId, amountWei, {
-            gasLimit: gasLimit
-        });
+        const tx = await masterchefContract.withdraw(currentPoolId, amountWei);
         
         showStatus('Transaction submitted. Waiting for confirmation...', 'info');
         
@@ -608,10 +525,6 @@ async function unstakeTokens() {
             errorMsg = 'Transaction rejected by user';
         } else if (error.message.includes('insufficient funds')) {
             errorMsg = 'Insufficient ETH for gas fees';
-        } else if (error.message.includes('withdraw: not good')) {
-            errorMsg = 'Insufficient staked amount';
-        } else if (error.message) {
-            errorMsg = error.message;
         }
         
         showStatus(errorMsg, 'error');
@@ -636,21 +549,8 @@ async function claimRewards() {
             return;
         }
         
-        // Estimate gas for claim (withdraw 0)
-        let gasLimit;
-        try {
-            const gasEstimate = await masterchefContract.estimateGas.withdraw(currentPoolId, 0);
-            gasLimit = gasEstimate.mul(120).div(100); // Add 20% buffer
-            console.log('⛽ Claim gas estimate:', gasEstimate.toString());
-        } catch (gasError) {
-            console.warn('⚠️ Could not estimate gas, using default');
-            gasLimit = 150000;
-        }
-        
         // Send claim transaction (withdraw 0)
-        const tx = await masterchefContract.withdraw(currentPoolId, 0, {
-            gasLimit: gasLimit
-        });
+        const tx = await masterchefContract.withdraw(currentPoolId, 0);
         
         showStatus('Transaction submitted. Waiting for confirmation...', 'info');
         
@@ -660,43 +560,4 @@ async function claimRewards() {
             showStatus(`Successfully claimed ${parseFloat(pendingAmount).toFixed(4)} ENiAC!`, 'success');
             
             // Reload data
-            await loadUserData();
-            
-        } else {
-            throw new Error('Transaction failed');
-        }
-        
-    } catch (error) {
-        console.error('❌ Claim error:', error);
-        
-        let errorMsg = 'Claim failed';
-        if (error.code === 4001) {
-            errorMsg = 'Transaction rejected by user';
-        } else if (error.message.includes('insufficient funds')) {
-            errorMsg = 'Insufficient ETH for gas fees';
-        } else if (error.message) {
-            errorMsg = error.message;
-        }
-        
-        showStatus(errorMsg, 'error');
-    }
-}
-
-// ============================
-// HELPER FUNCTIONS
-// ============================
-function showStatus(message, type = 'info') {
-    statusMessage.textContent = message;
-    statusMessage.className = 'status-message ' + type;
-    statusMessage.style.display = 'block';
-    
-    // Auto hide after 5 seconds
-    setTimeout(() => {
-        statusMessage.style.display = 'none';
-    }, 5000);
-}
-
-// ============================
-// INITIAL LOG
-// ============================
-console.log('✅ ENiAC Staking DApp initialized successfully');
+           
