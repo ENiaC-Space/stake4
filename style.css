@@ -1,0 +1,246 @@
+/* Add these styles to the existing style.css */
+
+/* Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+}
+
+.loading-spinner {
+    text-align: center;
+}
+
+.loading-spinner .spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(59, 130, 246, 0.3);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    animation: spin 1s linear infinite;
+}
+
+.loading-spinner p {
+    color: #94a3b8;
+    font-size: 1.1rem;
+}
+
+/* Warning Box */
+.warning-box {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.2) 100%);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin: 1.5rem auto;
+    max-width: 600px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    animation: pulseWarning 2s infinite;
+}
+
+.warning-box i {
+    color: #f59e0b;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.warning-box p {
+    color: #f1f5f9;
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+@keyframes pulseWarning {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Wallet Status */
+.wallet-status {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.wallet-status i {
+    color: #60a5fa;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.wallet-status p {
+    color: #e2e8f0;
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+/* Help Section */
+.help-section {
+    margin: 4rem 0;
+    text-align: center;
+}
+
+.help-section h2 {
+    font-size: 2rem;
+    margin-bottom: 2.5rem;
+    color: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.help-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.help-card {
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(100, 116, 139, 0.3);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.help-card:hover {
+    transform: translateY(-5px);
+    border-color: #3b82f6;
+}
+
+.help-card i {
+    font-size: 2.5rem;
+    color: #60a5fa;
+    margin-bottom: 1.5rem;
+}
+
+.help-card h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: #f1f5f9;
+}
+
+.help-card p {
+    color: #94a3b8;
+    line-height: 1.6;
+}
+
+/* Version Badge */
+.version {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: inline-block;
+    margin-top: 1rem;
+}
+
+/* Network Status in Footer */
+.network-status {
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 12px;
+    padding: 1rem;
+    border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+/* Button States */
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.btn.loading {
+    position: relative;
+    color: transparent !important;
+}
+
+.btn.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* Input States */
+input:disabled {
+    background: rgba(15, 23, 42, 0.3) !important;
+    color: #64748b !important;
+    cursor: not-allowed;
+}
+
+/* Error States */
+.error-state {
+    text-align: center;
+    padding: 3rem;
+    color: #f87171;
+}
+
+.error-state i {
+    font-size: 3rem;
+    margin-bottom: 1.5rem;
+}
+
+.error-state p {
+    font-size: 1.1rem;
+}
+
+/* Success States */
+.success-state {
+    text-align: center;
+    padding: 3rem;
+    color: #4ade80;
+}
+
+.success-state i {
+    font-size: 3rem;
+    margin-bottom: 1.5rem;
+}
+
+.success-state p {
+    font-size: 1.1rem;
+}
+
+/* Responsive Improvements */
+@media (max-width: 768px) {
+    .warning-box {
+        flex-direction: column;
+        text-align: center;
+        padding: 1rem;
+    }
+    
+    .wallet-status {
+        flex-direction: column;
+        text-align: center;
+        padding: 1rem;
+    }
+    
+    .help-cards {
+        grid-template-columns: 1fr;
+    }
+}
